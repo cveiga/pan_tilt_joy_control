@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   mar_robot_arm5e
   roscpp
   sensor_msgs
+  pan_tilt_camera_teleop
 )
 
 
@@ -17,6 +18,7 @@ catkin_package(
    mar_robot_arm5e
    roscpp 
    sensor_msgs
+   pan_tilt_camera_teleop
 #  DEPENDS system_lib
 )
 

@@ -4,7 +4,9 @@
 #include <iostream>
 #include <cstdlib>
 #include <vector>
+#include <pan_tilt_camera_teleop/PanTiltController.h>
 
+#define umbral 0.3
 
 /** /////////////////////////////////////////////////////////////////////////////////////////
  * 	"axes" vector de 8 elementos															/
@@ -31,7 +33,10 @@
 	joy->buttons[10] ---->> Joystick derecho												/
 ///////////////////////////////////////////////////////////////////////////////////////////*/
 
+PanTiltController ptc;
 
+bool _dir, _bandera = false;
+int _indice;
 /*bool _l_joy = false;
 
 
@@ -42,21 +47,78 @@ void launch_Joy(){
 }*/
 
 
+
+void envia_OrdenParada(){
+	ptc.stopPanTilt();
+	switch(_indice){
+		case 0:
+			if(!_dir)
+				std::cout << "STOP DERECHA" << std::endl;
+			else
+				std::cout << "STOP IZQIERDA" << std::endl;
+			break;
+		case 1:
+			if(!_dir)
+				std::cout << "STOP BAJAR" << std::endl;
+			else
+				std::cout << "STOP SUBIR" << std::endl;
+			break;
+	}
+}
+
+
+
+void envia_Orden(){
+	switch(_indice){
+		case 0:
+			if(!_dir){
+				std::cout << "DERECHA" << std::endl;
+				ptc.right();}
+			else{
+				std::cout << "IZQIERDA" << std::endl;
+				ptc.left();}
+			break;
+		case 1:
+			if(!_dir){
+				std::cout << "BAJAR" << std::endl;
+				ptc.tiltdown();}
+			else{
+				std::cout << "SUBIR" << std::endl;
+				ptc.tiltup();}
+			break;
+	}
+}
+
+
+
 void joy_CallBack(const sensor_msgs::Joy::ConstPtr& joy){
-	std::cout << "tenemos " << joy->axes.size() << " ejes " << std::endl;
-	std::cout << "tenemos " << joy->buttons.size() << " botones " << std::endl;
-	
-	std::cout << joy->buttons[0] << std::endl; //A
-	std::cout << joy->buttons[1] << std::endl; //B
-	std::cout << joy->buttons[2] << std::endl; //X
-	std::cout << joy->buttons[3] << std::endl; //Y
-	std::cout << joy->buttons[4] << std::endl; //LB
-	std::cout << joy->buttons[5] << std::endl; //RB
-	std::cout << joy->buttons[6] << std::endl; //BACK
-	std::cout << joy->buttons[7] << std::endl; //START
-	std::cout << joy->buttons[8] << std::endl; //XBox
-	std::cout << joy->buttons[9] << std::endl; //Joystick izquierdo
-	std::cout << joy->buttons[10] << std::endl; //Joystick derecho
+		if(!_bandera){
+			for(int i = 0; i < 2/*joy->axes.size()*/; i++){
+				if(joy->axes[i] > umbral or joy->axes[i] < -umbral){
+					_indice = i;
+					if(joy->axes[i] < -umbral){
+						_dir = false;
+						_bandera = true;
+					}
+					if(joy->axes[i] > umbral){
+						_dir = true;
+						_bandera = true;
+					}
+				}
+				
+				if(_bandera){
+					envia_Orden();
+					break;
+				}
+			}
+		}
+		else{
+			if(joy->axes[_indice] < 0.3 and joy->axes[_indice] > -0.3){
+				envia_OrdenParada();
+				_bandera = false;
+			}
+		}
+		
 }
 
 
