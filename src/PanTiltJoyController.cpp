@@ -6,7 +6,7 @@
 #include <vector>
 #include <pan_tilt_camera_teleop/PanTiltController.h>
 
-#define umbral 0.3
+#define UMBRAL 0.3
 
 /** /////////////////////////////////////////////////////////////////////////////////////////
  * 	"axes" vector de 8 elementos															/
@@ -32,6 +32,8 @@
 	joy->buttons[9] ---->> Joystick izquierdo												/
 	joy->buttons[10] ---->> Joystick derecho												/
 ///////////////////////////////////////////////////////////////////////////////////////////*/
+//Los botones LT y RT hay que controlarlos de forma distinta por que los valores que devuelven
+//son diferentes de los demas
 
 PanTiltController ptc;
 
@@ -48,23 +50,36 @@ void launch_Joy(){
 
 
 
-void envia_OrdenParada(){
-	ptc.stopPanTilt();
-	switch(_indice){
-		case 0:
-			if(!_dir)
-				std::cout << "STOP DERECHA" << std::endl;
-			else
-				std::cout << "STOP IZQIERDA" << std::endl;
-			break;
-		case 1:
-			if(!_dir)
-				std::cout << "STOP BAJAR" << std::endl;
-			else
-				std::cout << "STOP SUBIR" << std::endl;
-			break;
+//Función especial para los Joysticks
+//Con ella controlo la dirección dependiendo de si el valor es negativo o pisitivo
+inline void auxFunction(const float dato){
+	if(dato < -UMBRAL){
+		_dir = false;
+		_bandera = true;
+	}
+	if(dato > UMBRAL){
+		_dir = true;
+		_bandera = true;
 	}
 }
+
+
+
+
+void envia_OrdenParada(){
+	switch(_indice){
+		case 2:
+			std::cout << "STOP ZOOM-" << std::endl;
+			ptc.wideStop();
+			break;
+		case 5:
+			std::cout << "STOP ZOOM+" << std::endl;
+			ptc.teleStop();
+			break;
+		default: ptc.stopPanTilt();	//Hay una función para parar cualquier rotación de la cámara
+	}
+}
+
 
 
 
@@ -86,37 +101,75 @@ void envia_Orden(){
 				std::cout << "SUBIR" << std::endl;
 				ptc.tiltup();}
 			break;
+		case 2:
+				std::cout << "ZOOM-" <<	std::endl;
+				ptc.wideStart();
+			break;
+		case 5:
+				std::cout << "ZOOM+" << std::endl;
+				ptc.teleStart();
+			break;
 	}
 }
 
 
 
-void joy_CallBack(const sensor_msgs::Joy::ConstPtr& joy){
-		if(!_bandera){
-			for(int i = 0; i < 2/*joy->axes.size()*/; i++){
-				if(joy->axes[i] > umbral or joy->axes[i] < -umbral){
-					_indice = i;
-					if(joy->axes[i] < -umbral){
-						_dir = false;
-						_bandera = true;
-					}
-					if(joy->axes[i] > umbral){
-						_dir = true;
-						_bandera = true;
-					}
-				}
-				
-				if(_bandera){
-					envia_Orden();
-					break;
-				}
+template <class T>
+void findInJoy(const std::vector<T> &axes, int init){
+	if(!_bandera){
+		float_t dato;
+		for(int i = init; i < axes.size(); i++){
+			dato = axes[i];
+			if(i == 2 or i == 5)
+				dato = dato -1;
+			if(dato > UMBRAL or dato < -UMBRAL){
+				_indice = i;
+				auxFunction(dato);
+			}
+					
+			if(_bandera){
+				envia_Orden();
+				break;
 			}
 		}
+	}
+}
+
+
+
+
+template <class T>
+void joyStop(const std::vector<T> &axes){		//, T const& umb){
+	float_t dato = axes[_indice];
+	if(_indice == 2 or _indice == 5){
+		dato = dato -1;
+		if(dato > -UMBRAL){
+			envia_OrdenParada();
+			_bandera = false;
+		}
+	}
+	else{
+		if(axes[_indice] < UMBRAL and axes[_indice] > -UMBRAL){
+			envia_OrdenParada();
+			_bandera = false;
+		}
+	}
+}
+
+
+
+
+
+void joy_CallBack(const sensor_msgs::Joy::ConstPtr& joy){
+		if(!_bandera){
+			findInJoy(joy->axes, 0); //, (float)0.3);
+			/*if(!_bandera)
+				findInJoy(joy->buttons, 4, 6); //, (int)1);*/
+		}
 		else{
-			if(joy->axes[_indice] < 0.3 and joy->axes[_indice] > -0.3){
-				envia_OrdenParada();
-				_bandera = false;
-			}
+			joyStop(joy->axes);	//, (float)0.3);
+			/*if(_bandera)
+				joyStop(joy->buttons, 1);*/
 		}
 		
 }
