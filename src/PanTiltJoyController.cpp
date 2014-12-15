@@ -35,9 +35,9 @@
 //Los botones LT y RT hay que controlarlos de forma distinta por que los valores que devuelven
 //son diferentes de los demas
 
-PanTiltController ptc;
+PanTiltController _ptc;
 
-bool _dir, _bandera = false;
+bool _dir, _bandera = false, _buttons = false;
 int _indice;
 /*bool _l_joy = false;
 
@@ -65,18 +65,26 @@ inline void auxFunction(const float dato){
 
 
 
+int compruebaOrden(){
+	if(_buttons)
+		return _indice+8;
+	return _indice;
+}
+
+
 
 void envia_OrdenParada(){
-	switch(_indice){
-		case 2:
+	int dato = compruebaOrden();
+	switch(dato){
+		case 12:
 			std::cout << "STOP ZOOM-" << std::endl;
-			ptc.wideStop();
+			_ptc.wideStop();
 			break;
-		case 5:
+		case 13:
 			std::cout << "STOP ZOOM+" << std::endl;
-			ptc.teleStop();
+			_ptc.teleStop();
 			break;
-		default: ptc.stopPanTilt();	//Hay una función para parar cualquier rotación de la cámara
+		default: _ptc.stopPanTilt();	//Hay una función para parar cualquier rotación de la cámara
 	}
 }
 
@@ -84,30 +92,31 @@ void envia_OrdenParada(){
 
 
 void envia_Orden(){
-	switch(_indice){
+	int dato = compruebaOrden();
+	switch(dato){
 		case 0:
 			if(!_dir){
 				std::cout << "DERECHA" << std::endl;
-				ptc.right();}
+				_ptc.right();}
 			else{
 				std::cout << "IZQIERDA" << std::endl;
-				ptc.left();}
+				_ptc.left();}
 			break;
 		case 1:
 			if(!_dir){
 				std::cout << "BAJAR" << std::endl;
-				ptc.tiltdown();}
+				_ptc.tiltdown();}
 			else{
 				std::cout << "SUBIR" << std::endl;
-				ptc.tiltup();}
+				_ptc.tiltup();}
 			break;
-		case 2:
+		case 12:
 				std::cout << "ZOOM-" <<	std::endl;
-				ptc.wideStart();
+				_ptc.wideStart();
 			break;
-		case 5:
+		case 13:
 				std::cout << "ZOOM+" << std::endl;
-				ptc.teleStart();
+				_ptc.teleStart();
 			break;
 	}
 }
@@ -115,13 +124,15 @@ void envia_Orden(){
 
 
 template <class T>
-void findInJoy(const std::vector<T> &axes, int init){
+void findInJoy(const std::vector<T> &axes, int init, int end = 0){
+	int fin = (end == 0 ? axes.size() : end);
 	if(!_bandera){
 		float_t dato;
-		for(int i = init; i < axes.size(); i++){
+		for(int i = init; i < fin; i++){
 			dato = axes[i];
-			if(i == 2 or i == 5)
-				dato = dato -1;
+			if(!_buttons)	//si no son los botones, controlo el LT y el RT
+				if(i == 2 or i == 5)
+					dato = dato -1;
 			if(dato > UMBRAL or dato < -UMBRAL){
 				_indice = i;
 				auxFunction(dato);
@@ -139,21 +150,25 @@ void findInJoy(const std::vector<T> &axes, int init){
 
 
 template <class T>
-void joyStop(const std::vector<T> &axes){		//, T const& umb){
+bool joyStop(const std::vector<T> &axes, T const& umb = 0){
 	float_t dato = axes[_indice];
-	if(_indice == 2 or _indice == 5){
-		dato = dato -1;
-		if(dato > -UMBRAL){
-			envia_OrdenParada();
-			_bandera = false;
+	if(!_buttons){			//si es el vector de ejes, miro si son el LT o el RT
+		if(_indice == 2 or _indice == 5){
+			dato = dato -1;
+			if(dato > -umb){
+				envia_OrdenParada();
+				_bandera = false;
+				return true;
+			}
 		}
 	}
-	else{
-		if(axes[_indice] < UMBRAL and axes[_indice] > -UMBRAL){
-			envia_OrdenParada();
-			_bandera = false;
-		}
+	if(abs(axes[_indice]) < umb){		// and axes[_indice] > -umbral){
+		envia_OrdenParada();
+		_bandera = false;
+		return true;
 	}
+		
+	return false;
 }
 
 
@@ -162,16 +177,20 @@ void joyStop(const std::vector<T> &axes){		//, T const& umb){
 
 void joy_CallBack(const sensor_msgs::Joy::ConstPtr& joy){
 		if(!_bandera){
-			findInJoy(joy->axes, 0); //, (float)0.3);
-			/*if(!_bandera)
-				findInJoy(joy->buttons, 4, 6); //, (int)1);*/
+			_buttons = false;
+			findInJoy(joy->axes, 0, 2); //, (float)0.3);
+			if(!_bandera){
+				_buttons = true;
+				findInJoy(joy->buttons, 4, 6); //, (int)1);
+			}
 		}
 		else{
-			joyStop(joy->axes);	//, (float)0.3);
-			/*if(_bandera)
-				joyStop(joy->buttons, 1);*/
-		}
-		
+			if(!_buttons)
+				joyStop(joy->axes, (float)0.3);
+			else{
+				joyStop(joy->buttons, (int)1);
+			}
+		}		
 }
 
 
